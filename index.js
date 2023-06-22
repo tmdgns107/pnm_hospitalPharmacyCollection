@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import mysql from 'mysql2/promise';
 import * as util from 'util.js';
-import * as dbConfig from 'db.config.json';
+import dbConfig from 'db.config.json';
 
 async function main(alias, type) {
     try{
