@@ -2,3 +2,4 @@ node_modules/
 dist/
 deploy.zip
 *.log
+db.config.json

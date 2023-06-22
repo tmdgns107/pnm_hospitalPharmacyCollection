@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import mysql from 'mysql2/promise';
 import * as util from 'util.js';
+import * as dbConfig from 'db.config.json';
 
 async function main(alias, type) {
     try{
@@ -58,11 +59,11 @@ async function main(alias, type) {
         console.log("Data", JSON.stringify(data, null, 2));
 
         let connection = await mysql.createConnection({
-            host: 'db-petnmatt.cs0nb5zlvm5n.ap-northeast-2.rds.amazonaws.com',
-            user: 'admin',
-            password: 'wnakf0510#',
-            port: 3306,
-            database: 'mydb'
+            host: dbConfig.host,
+            user: dbConfig.user,
+            password: dbConfig.password,
+            port: dbConfig.port,
+            database: dbConfig.database
         });
 
         for(let publicData of filteredPublicData){
