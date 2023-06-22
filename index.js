@@ -2,10 +2,10 @@ import fs from 'fs';
 import Papa from 'papaparse';
 import iconv from 'iconv-lite';
 import mysql from 'mysql2/promise';
-import * as util from 'util.js';
-import dbConfig from 'db.config.json';
+import { convertEPSGToWGS84, sleep } from './util.js';
+import dbConfig from './db.config.json';
 
-async function main(alias, type) {
+async function processCsvData(alias, type) {
     try{
         const csvFilePath = `./public_${type}.csv`;
         const csvBuffer = await fs.readFileSync(csvFilePath);
@@ -23,36 +23,30 @@ async function main(alias, type) {
             tableName = tableName.replace('_test', '');
 
         const updateTime = new Date().toISOString();
-        let filteredPublicData = data.filter(item => {
-            if(item["영업상태명"] && (item["영업상태명"].includes("휴업") || item["영업상태명"].includes("정상")))
-                return item;
-        }).slice(0, 10).map(item => {
-            let address;
-            if (item["소재지전체주소"])
-                address = item["소재지전체주소"].split(' ');
-            let wgs84;
-            if (item["좌표정보(x)"] && item["좌표정보(y)"])
-                wgs84 = util.convertEPSGToWGS84(Number(item["좌표정보(x)"]), Number(item["좌표정보(y)"]));
+        let filteredPublicData = data.filter(item => item["영업상태명"] && (item["영업상태명"].includes("휴업") || item["영업상태명"].includes("정상")))
+            .slice(0, 10).map(item => {
+            const address = item["소재지전체주소"]?.split(' ');
+            const wgs84 = item["좌표정보(x)"] && item["좌표정보(y)"] ? convertEPSGToWGS84(Number(item["좌표정보(x)"]), Number(item["좌표정보(y)"])) : undefined;
 
             console.log("wgs84", wgs84);
             return {
                 id: item["관리번호"],
-                sidoNm: address ? address[0] : "",
-                sigunNm: address ? address[1] : "",
-                dongNm: address ? address[2] : "",
+                sidoNm: address?.[0] || "",
+                sigunNm: address?.[1] || "",
+                dongNm: address?.[2] || "",
                 bizPlcNm: item["사업장명"],
                 roadNmAddr: item["도로명전체주소"],
                 lotNoAddr: item["소재지전체주소"],
                 zipCode: item["도로명우편번호"],
-                lat: wgs84 ? wgs84[0] : "",
-                lng: wgs84 ? wgs84[1] : "",
-                status: item["상세영업상태명"] ? item["상세영업상태명"] : item["영업상태명"],
+                lat: wgs84?.[0] || "",
+                lng: wgs84?.[1] || "",
+                status: item["상세영업상태명"] || item["영업상태명"],
                 telNo: item["소재지전화"],
-                updateTime: updateTime,
+                updateTime,
                 collectDate: '2022-05-31',
-                closedStartDate: item["휴업시작일자"] ? item["휴업시작일자"] : "",
-                closedEndDate: item["휴업종료일자"] ? item["휴업종료일자"] : "",
-                reopenDate: item["재개업일자"] ? item["재개업일자"] : "",
+                closedStartDate: item["휴업시작일자"] || "",
+                closedEndDate: item["휴업종료일자"] || "",
+                reopenDate: item["재개업일자"] || "",
             };
         });
 
@@ -82,17 +76,16 @@ async function main(alias, type) {
                         sidoNm = ?, sigunNm = ?, dongNm = ?, bizPlcNm = ?, roadNmAddr = ?, 
                         lotNoAddr = ?, zipCode = ?, lat = ?, lng = ?, status = ?, 
                         telNo = ?, updateTime = ?, collectTime = ?, closedStartDate = ?,
-                        closedEndDate ?, reopenDate = ?
+                        closedEndDate = ?, reopenDate = ?
                     WHERE 
                         id = ?`;
 
                 console.log(`updateQuery ${id}`, updateQuery);
-                let values = [];
-                for(let key in publicData)
-                    values.push(publicData[key]);
+                delete publicData.id;
+                const values = Object.values(publicData);
                 console.log("values", values);
 
-                await connection.execute(updateQuery, values);
+                await connection.execute(updateQuery, [...values, id]);
                 console.log(`A new row has been updated. id: ${id}`);
             }else{
                 console.log("Not exist publicData");
@@ -115,7 +108,7 @@ async function main(alias, type) {
                 console.log(`A new row has been inserted. id: ${id}`);
             }
 
-            await util.sleep(100);
+            await sleep(100);
         }
 
         console.log("Data collection complete.")
@@ -125,5 +118,8 @@ async function main(alias, type) {
     }
 }
 
+async function main() {
+    await processCsvData('dev', 'hospital');
+}
 
-main('dev', 'hospital');
+main();
